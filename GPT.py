@@ -1,7 +1,6 @@
 import openai
 
 def gpt(object):
-    openai.api_key = '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'
 
     input('If you want to pick up an' + object + ', which part makes the most sense to grasp? Name one part.')
 
