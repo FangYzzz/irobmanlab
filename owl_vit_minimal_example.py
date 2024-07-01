@@ -28,7 +28,7 @@ OWL-ViT is implemented in [Scenic](https://github.com/google-research/scenic). T
 # !git clone https://github.com/google-research/big_vision.git /big_vision
 # !python -m pip install -r /big_vision/big_vision/requirements.txt
 import sys
-sys.path.append('/big_vision/')
+sys.path.append('big_vision/')
 # !echo "Done."
 
 import os
