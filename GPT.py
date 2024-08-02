@@ -19,7 +19,7 @@ def get_grasp_object(assistant_message):
 
 
 def gpt_grasp_part(grasp_object):
-    openai.api_key = ''
+    # ddddd
     # input("If you want to pick up an {grasp_object}, which part makes the most sense to grasp? Name one part.")
 
     msg = {'role':'user', 'content': "If you want to pick up " + grasp_object + ", which part makes the most sense to grasp? Name one part(just a phrase)."}
@@ -48,8 +48,7 @@ def get_chatgpt_response(messages):
 
 
 def gpt_dialogue():
-    openai.api_key = ''
-    
+# dddd    
     message = [
     {"role": "system", "content": """
         Task: You are AI and in a kitchen. I am Human and will ask you for help. I will tell you, the objects on the table. Generate answer for object search and grasp. 
