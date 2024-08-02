@@ -19,7 +19,7 @@ def get_grasp_object(assistant_message):
 
 
 def gpt_grasp_part(grasp_object):
-    openai.api_key = 'sk-proj-nEvkLeZMqmdnNVxMyiXET3BlbkFJGyJ64uAJnGmdT0P02I68'
+    openai.api_key = ''
     # input("If you want to pick up an {grasp_object}, which part makes the most sense to grasp? Name one part.")
 
     msg = {'role':'user', 'content': "If you want to pick up " + grasp_object + ", which part makes the most sense to grasp? Name one part(just a phrase)."}
@@ -48,7 +48,7 @@ def get_chatgpt_response(messages):
 
 
 def gpt_dialogue():
-    openai.api_key = 'sk-proj-nEvkLeZMqmdnNVxMyiXET3BlbkFJGyJ64uAJnGmdT0P02I68'
+    openai.api_key = ''
     
     message = [
     {"role": "system", "content": """
