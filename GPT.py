@@ -22,6 +22,8 @@ def gpt_grasp_part(grasp_object):
     # ddddd
     # input("If you want to pick up an {grasp_object}, which part makes the most sense to grasp? Name one part.")
 
+
+
     msg = {'role':'user', 'content': "If you want to pick up " + grasp_object + ", which part makes the most sense to grasp? Name one part(just a phrase)."}
     result = openai.ChatCompletion.create(model='gpt-4', messages=[msg])      # gpt-3.5-turbo
     grasp_part = result.choices[0].message['content']
