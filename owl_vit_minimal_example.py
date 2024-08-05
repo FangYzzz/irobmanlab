@@ -48,6 +48,8 @@ from skimage import transform as skimage_transform
 import io
 from PIL import Image
 
+import matplotlib.pyplot as plt
+
 # import camera_capture
 # import GPT
 # import grasp
@@ -59,8 +61,12 @@ import tensorflow as tf
 This will take a minute on the first execution due to model compilation. Subsequent executions will be faster.
 """
 
-def prediction(module, variables, input_image, tokenized_queries, text_queries):
+def prediction(module, variables, input_image, tokenized_queries, text_queries, crop,cx_=0,cy_=0, m_img=None, width_ =0, height_=0):
+    """
+    return fig, weight, height
+    """
     jitted = jax.jit(module.apply, static_argnames=('train',)) 
+    
 
     # Note: The model expects a batch dimension.
     predictions = jitted(
@@ -85,31 +91,82 @@ def prediction(module, variables, input_image, tokenized_queries, text_queries):
     labels = np.argmax(predictions['pred_logits'], axis=-1)
     boxes = predictions['pred_boxes']
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    ax.imshow(input_image, extent=(0, 1, 1, 0))
-    ax.set_axis_off()
+    
+
+    if(crop==False):
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        ax.imshow(m_img, extent=(0, 1, 1, 0))   
+        ax.set_axis_off()
+
+
 
     for score, box, label in zip(scores, boxes, labels):
         if score < score_threshold:
             continue
 
         cx, cy, w, h = box
-        ax.plot([cx - w / 2, cx + w / 2, cx + w / 2, cx - w / 2, cx - w / 2],
-                [cy - h / 2, cy - h / 2, cy + h / 2, cy + h / 2, cy - h / 2], 'r')
-        ax.text(
-            cx - w / 2,
-            cy + h / 2 + 0.015,
-            f'{text_queries[label]}: {score:1.2f}',
-            ha='left',
-            va='top',
-            color='red',
-            bbox={
-                'facecolor': 'white',
-                'edgecolor': 'red',
-                'boxstyle': 'square,pad=.3'
-            })
+        if crop == True:                                       # 33333
+            img_height, img_width, _ = input_image.shape
+            print("input_image")
+            print(img_height, img_width)
+            # 计算裁剪区域的左上和右下坐标
+            left = int((cx - w / 2) * img_width)
+            upper = int((cy - h / 2) * img_height)
+            right = int((cx + w / 2) * img_width)
+            lower = int((cy + h / 2) * img_height)
+
+            # 裁剪图像
+            cropped_image_array = input_image[upper:lower, left:right]
+
+            # 将裁剪的 NumPy 数组转换为 Pillow 图像对象
+            cropped_image = Image.fromarray((cropped_image_array * 255).astype(np.uint8))
+
+            # 保存裁剪的图像
+            cropped_image.save(os.path.join('/home/yuan/Mani-GPT/camera_capture/cropped_image_6.jpg'))
+            # cropped_image.show()
+            
+            height_c, width_c,_= cropped_image_array.shape
+            print("crop_image")
+            print(height_c, width_c)
+            return input_image, cx, cy, height_c, width_c
         
-    return fig     # 11111
+        else:
+            img_height, img_width, _ = input_image.shape
+            img_height_, img_width_, _ = m_img.shape
+
+            print(img_height, img_width, img_height_, img_width_)
+            size = max(height_, width_)
+            cx = cx*size/width_
+
+            cx = cx_-0.5*width_/img_width_ + cx*width_/img_width_
+            cy = cy*size/height_
+            cy = cy_-0.5*height_/img_height_ + cy*height_/img_height_
+
+            
+            w = w*size/img_width_
+            h = h*size/img_height_
+            print(size)
+            print("start to draw")
+            print(cx, cy, w, h)
+            ax.plot([cx - w / 2, cx + w / 2, cx + w / 2, cx - w / 2, cx - w / 2],
+                [cy - h / 2, cy - h / 2, cy + h / 2, cy + h / 2, cy - h / 2], 'r')
+            ax.text(
+                cx - w / 2,
+                cy + h / 2 + 0.015,
+                f'{text_queries[label]}: {score:1.2f}',
+                ha='left',
+                va='top',
+                color='red',
+                bbox={
+                    'facecolor': 'white',
+                    'edgecolor': 'red',
+                    'boxstyle': 'square,pad=.3'
+                })
+        
+    if(crop==False):
+        plt.show()  
+        
+    return 0, 0, 0, 0, 0   # 11111
         
 
 def plot_and_return_image(fig):
@@ -124,7 +181,7 @@ def plot_and_return_image(fig):
     return buf.getvalue()
 
 
-def detect_grasp_part(grasp_part):
+def detect_grasp_name(grasp_name, crop, cx_=0, cy_=0, input_image_=None, height=0, width=0):
 
     """# Choose config"""
 
@@ -140,6 +197,7 @@ def detect_grasp_part(grasp_part):
         box_bias=config.model.box_bias)
     variables = module.load_variables(config.init_from.checkpoint_path)
 
+    # jitted = jax.jit(module.apply, static_argnames=('train',)) 
 
     """# Prepare image"""
 
@@ -147,9 +205,16 @@ def detect_grasp_part(grasp_part):
     # filepath = camera_capture.video_demo()   # 00000
 
     # Load example image:
-    # filename = os.path.join(skimage.data_dir, 'astronaut.png')
     # filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/1.png')   # 11111
-    filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/6.jpeg')
+    
+    crop = crop
+    
+    if crop == True:
+        filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/6.jpeg')
+    else:
+        filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/cropped_image_6.jpg')
+
+
 
     image_uint8 = skimage_io.imread(filename_input)
     image = image_uint8.astype(np.float32) / 255.0
@@ -171,8 +236,8 @@ def detect_grasp_part(grasp_part):
 
     """# Prepare text queries"""
 
-    # grasp_part = GPT.gpt_dialogue()                                               
-    text_queries = [grasp_part]                                                    # 11111
+    # grasp_name = GPT.gpt_dialogue()                                               
+    text_queries = [grasp_name]                                                    # 11111
     # text_queries = ['saucepan', 'knife']                                         
     # text_queries = ['fork']
 
@@ -188,23 +253,296 @@ def detect_grasp_part(grasp_part):
         pad_width=((0, 100 - len(text_queries)), (0, 0)),
         constant_values=0)
 
-
-    fig = prediction(module, variables, input_image, tokenized_queries, text_queries)
-
+    if crop== True:
+        image, cx, cy, height, width = prediction(module, variables, input_image, tokenized_queries, text_queries, crop)
+        return image, cx, cy, height, width
+    else:
+        ## sub fig
+        prediction(module, variables, input_image, tokenized_queries, text_queries, crop, cx_, cy_, input_image_, width_=width, height_=height)
+    
+    return 0, 0, 0, 0, 0
     
     # Call the function and get the byte stream
-    image_bytes = plot_and_return_image(fig)
+    # image_bytes = plot_and_return_image(image)                      # 55555
 
 
-    return image_bytes
+    # return image_bytes                                              # 55555
 
 
 
+# filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/6.jpeg')
+# image_uint8 = skimage_io.imread(filename_input)
+# image = image_uint8.astype(np.float32) / 255.0
+# # print(image.shape)
+# config = configs.owl_v2_clip_b16.get_config(init_mode='canonical_checkpoint')
+# # Pad to square with gray pixels on bottom and right:
+# h, w, _ = image.shape
+# size = max(h, w)
+# image_padded = np.pad(
+#     image, ((0, size - h), (0, size - w), (0, 0)), constant_values=0.5)
 
-# detect_grasp_part(grasp_part)
-# detect_grasp_part('fork')                      # 11111
+# # Resize to model input size:
+# input_image = skimage.transform.resize(
+#     image_padded,
+#     (config.dataset_configs.input_size, config.dataset_configs.input_size),
+#     anti_aliasing=True)
+# fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+# ax.imshow(input_image, extent=(0, 1, 1, 0))   
+# ax.set_axis_off()
+
+# cx = 0.1909
+# cy = 0.2711
+# w = 0.2657792
+# h = 0.12019
+# ax.plot([cx - w / 2, cx + w / 2, cx + w / 2, cx - w / 2, cx - w / 2],
+#                 [cy - h / 2, cy - h / 2, cy + h / 2, cy + h / 2, cy - h / 2], 'r')
+
+# plt.show()
+
+grasp_object = 'frying pan'
+grasp_part = 'The handle'
+    
+# convert a byte stream to an image object
+crop = True
+# image_bytes = detect_grasp_name(grasp_object, crop)                 # 55555
+image, cx, cy, height, width = detect_grasp_name(grasp_object, crop)
+crop = False
+# image_bytes = detect_grasp_name(grasp_part, crop)                   # 55555
+detect_grasp_name(grasp_part, crop, cx, cy, image,height, width)
+
+# image = Image.open(io.BytesIO(image_bytes))                         # 55555
+
+# # show the image
+# plt.imshow(image)
+# plt.axis('off')        # Hide axes
+# plt.show()
+
+
+
+# detect_grasp_name(grasp_name)
+# detect_grasp_name('the handle of Frying pan')                      # 11111
 
 
 
 # plt.show()
 # sys.exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# """# Get predictions
+# This will take a minute on the first execution due to model compilation. Subsequent executions will be faster.
+# """
+
+# def prediction(module, variables, input_image, tokenized_queries, text_queries, crop):
+#     jitted = jax.jit(module.apply, static_argnames=('train',)) 
+
+#     # Note: The model expects a batch dimension.
+#     predictions = jitted(
+#         variables,
+#         input_image[None, ...],
+#         tokenized_queries[None, ...],
+#         train=False)
+
+#     # Remove batch dimension and convert to numpy:
+#     predictions = jax.tree_util.tree_map(lambda x: np.array(x[0]), predictions)
+
+
+#     """# Plot predictions"""
+
+#     # Commented out IPython magic to ensure Python compatibility.
+#     # %matplotlib inline
+
+#     score_threshold = 0.2
+
+#     logits = predictions['pred_logits'][..., :len(text_queries)]  # Remove padding.
+#     scores = sigmoid(np.max(logits, axis=-1))
+#     labels = np.argmax(predictions['pred_logits'], axis=-1)
+#     boxes = predictions['pred_boxes']
+
+#     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+#     ax.imshow(input_image, extent=(0, 1, 1, 0))
+#     ax.set_axis_off()
+
+#     for score, box, label in zip(scores, boxes, labels):
+#         if score < score_threshold:
+#             continue
+
+#         cx, cy, w, h = box
+#         if crop == True:                                       # 33333
+#             img_height, img_width, _ = input_image.shape
+
+#             # 计算裁剪区域的左上和右下坐标
+#             left = int((cx - w / 2) * img_width)
+#             upper = int((cy - h / 2) * img_height)
+#             right = int((cx + w / 2) * img_width)
+#             lower = int((cy + h / 2) * img_height)
+
+#             # 裁剪图像
+#             cropped_image_array = input_image[upper:lower, left:right]
+
+#             # 将裁剪的 NumPy 数组转换为 Pillow 图像对象
+#             cropped_image = Image.fromarray((cropped_image_array * 255).astype(np.uint8))
+
+#             # 保存裁剪的图像
+#             cropped_image.save(os.path.join('/home/yuan/Mani-GPT/camera_capture/cropped_image_6.jpg'))
+#             # cropped_image.show()
+
+#             return cropped_image
+        
+#         else:
+#             ax.plot([cx - w / 2, cx + w / 2, cx + w / 2, cx - w / 2, cx - w / 2],
+#                 [cy - h / 2, cy - h / 2, cy + h / 2, cy + h / 2, cy - h / 2], 'r')
+#             ax.text(
+#                 cx - w / 2,
+#                 cy + h / 2 + 0.015,
+#                 f'{text_queries[label]}: {score:1.2f}',
+#                 ha='left',
+#                 va='top',
+#                 color='red',
+#                 bbox={
+#                     'facecolor': 'white',
+#                     'edgecolor': 'red',
+#                     'boxstyle': 'square,pad=.3'
+#                 })
+        
+#     plt.show()    
+        
+#     return fig     # 11111
+        
+
+# def plot_and_return_image(fig):
+
+#     # 使用 BytesIO 保存图像为字节流
+#     buf = io.BytesIO()
+#     fig.savefig(buf, format='jpeg')
+#     buf.seek(0)        
+
+#     # print(buf.getvalue())    
+
+#     return buf.getvalue()
+
+
+# def detect_grasp_name(grasp_name, crop):
+
+#     """# Choose config"""
+
+#     config = configs.owl_v2_clip_b16.get_config(init_mode='canonical_checkpoint')
+
+
+#     """# Load the model and variables"""
+
+#     module = models.TextZeroShotDetectionModule(
+#         body_configs=config.model.body,
+#         objectness_head_configs=config.model.objectness_head,
+#         normalize=config.model.normalize,
+#         box_bias=config.model.box_bias)
+#     variables = module.load_variables(config.init_from.checkpoint_path)
+
+
+#     """# Prepare image"""
+
+#     # filepath =camera_capture.zed()         # 11111
+#     # filepath = camera_capture.video_demo()   # 00000
+
+#     # Load example image:
+#     # filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/1.png')   # 11111
+    
+#     crop = crop
+    
+#     if crop == True:
+#         filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/6.jpeg')
+#     else:
+#         filename_input = os.path.join('/home/yuan/Mani-GPT/camera_capture/cropped_image_6.jpg')
+
+
+
+#     image_uint8 = skimage_io.imread(filename_input)
+#     image = image_uint8.astype(np.float32) / 255.0
+#     # print(image.shape)
+
+#     # Pad to square with gray pixels on bottom and right:
+#     h, w, _ = image.shape
+#     size = max(h, w)
+#     image_padded = np.pad(
+#         image, ((0, size - h), (0, size - w), (0, 0)), constant_values=0.5)
+
+#     # Resize to model input size:
+#     input_image = skimage.transform.resize(
+#         image_padded,
+#         (config.dataset_configs.input_size, config.dataset_configs.input_size),
+#         anti_aliasing=True)
+
+
+
+#     """# Prepare text queries"""
+
+#     # grasp_name = GPT.gpt_dialogue()                                               
+#     text_queries = [grasp_name]                                                    # 11111
+#     # text_queries = ['saucepan', 'knife']                                         
+#     # text_queries = ['fork']
+
+
+#     tokenized_queries = np.array([
+#         module.tokenize(q, config.dataset_configs.max_query_length)
+#         for q in text_queries
+#     ])
+
+#     # Pad tokenized queries to avoid recompilation if number of queries changes:
+#     tokenized_queries = np.pad(
+#         tokenized_queries,
+#         pad_width=((0, 100 - len(text_queries)), (0, 0)),
+#         constant_values=0)
+
+    
+#     image = prediction(module, variables, input_image, tokenized_queries, text_queries, crop)
+    
+    
+#     # Call the function and get the byte stream
+#     # image_bytes = plot_and_return_image(image)                      # 55555
+
+
+#     # return image_bytes                                              # 55555
+
+
+
+
+# grasp_object = 'frying pan'
+# grasp_part = 'The handle'
+    
+# # convert a byte stream to an image object
+# crop = True
+# # image_bytes = detect_grasp_name(grasp_object, crop)                 # 55555
+# detect_grasp_name(grasp_object, crop)
+# crop = False
+# # image_bytes = detect_grasp_name(grasp_part, crop)                   # 55555
+# detect_grasp_name(grasp_part, crop)
+
+# # image = Image.open(io.BytesIO(image_bytes))                         # 55555
+
+# # # show the image
+# # plt.imshow(image)
+# # plt.axis('off')        # Hide axes
+# # plt.show()
+
+
+
+# # detect_grasp_name(grasp_name)
+# # detect_grasp_name('the handle of Frying pan')                      # 11111
+
+
+
+# # plt.show()
+# # sys.exit()
